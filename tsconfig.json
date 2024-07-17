@@ -171,6 +171,9 @@
     },
     {
       "path": "./packages/cactus-plugin-persistence-fabric/tsconfig.json"
+    },
+    {
+      "path": "./examples/cactus-example-bidirectional-connect-rpc/tsconfig.json"
     }
   ],
   "compilerOptions": {

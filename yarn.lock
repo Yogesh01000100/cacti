@@ -9893,6 +9893,26 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@hyperledger/cactus-examples@workspace:examples/cactus-example-bidirectional-connect-rpc":
+  version: 0.0.0-use.local
+  resolution: "@hyperledger/cactus-examples@workspace:examples/cactus-example-bidirectional-connect-rpc"
+  dependencies:
+    "@hyperledger/cactus-cmd-api-server": "npm:2.0.0-rc.2"
+    "@hyperledger/cactus-common": "npm:2.0.0-rc.2"
+    "@hyperledger/cactus-core": "npm:2.0.0-rc.2"
+    "@hyperledger/cactus-core-api": "npm:2.0.0-rc.2"
+    "@hyperledger/cactus-plugin-keychain-memory": "npm:2.0.0-rc.2"
+    "@types/axios": "npm:^0.14.0"
+    "@types/cors": "npm:^2.8.17"
+    "@types/express": "npm:^4.17.21"
+    "@types/node": "npm:^20.14.11"
+    axios: "npm:1.7.2"
+    cors: "npm:^2.8.5"
+    express: "npm:^4.17.1"
+    typescript-optional: "npm:2.0.1"
+  languageName: unknown
+  linkType: soft
+
 "@hyperledger/cactus-plugin-bungee-hermes@workspace:packages/cactus-plugin-bungee-hermes":
   version: 0.0.0-use.local
   resolution: "@hyperledger/cactus-plugin-bungee-hermes@workspace:packages/cactus-plugin-bungee-hermes"
@@ -16376,6 +16396,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/axios@npm:^0.14.0":
+  version: 0.14.0
+  resolution: "@types/axios@npm:0.14.0"
+  dependencies:
+    axios: "npm:*"
+  checksum: 10/12a230b9404055d81804cb57fe4739b2317111b28a39e2477b2513250e8b85725e6f6ce509fc2a9494a6da60facb8d80df875fcd747f62f6c3abebc7db60ae66
+  languageName: node
+  linkType: hard
+
 "@types/babel__core@npm:^7.0.0":
   version: 7.20.2
   resolution: "@types/babel__core@npm:7.20.2"
@@ -16648,6 +16677,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/cors@npm:^2.8.17":
+  version: 2.8.17
+  resolution: "@types/cors@npm:2.8.17"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10/469bd85e29a35977099a3745c78e489916011169a664e97c4c3d6538143b0a16e4cc72b05b407dc008df3892ed7bf595f9b7c0f1f4680e169565ee9d64966bde
+  languageName: node
+  linkType: hard
+
 "@types/crypto-js@npm:4.0.1":
   version: 4.0.1
   resolution: "@types/crypto-js@npm:4.0.1"
@@ -16893,7 +16931,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/express@npm:4.17.21, @types/express@npm:^4.17.18":
+"@types/express@npm:4.17.21, @types/express@npm:^4.17.18, @types/express@npm:^4.17.21":
   version: 4.17.21
   resolution: "@types/express@npm:4.17.21"
   dependencies:
@@ -17485,6 +17523,15 @@ __metadata:
   version: 18.17.4
   resolution: "@types/node@npm:18.17.4"
   checksum: 10/1cd48b497af7cd6f0fcb3e31bebdc9aaef92178e1888e8842dcadda096f9e133535813e1de0efd981c3314fb3fde5988509d98dfbcec6bd4064467212e7bf878
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:^20.14.11":
+  version: 20.14.11
+  resolution: "@types/node@npm:20.14.11"
+  dependencies:
+    undici-types: "npm:~5.26.4"
+  checksum: 10/344e1ce1ed16c86ed1c4209ab4d1de67db83dd6b694a6fabe295c47144dde2c58dabddae9f39a0a2bdd246e95f8d141ccfe848e464884b48b8918df4f7788025
   languageName: node
   linkType: hard
 
@@ -51910,6 +51957,13 @@ __metadata:
   version: 2.0.5
   resolution: "undefsafe@npm:2.0.5"
   checksum: 10/f42ab3b5770fedd4ada175fc1b2eb775b78f609156f7c389106aafd231bfc210813ee49f54483d7191d7b76e483bc7f537b5d92d19ded27156baf57592eb02cc
+  languageName: node
+  linkType: hard
+
+"undici-types@npm:~5.26.4":
+  version: 5.26.5
+  resolution: "undici-types@npm:5.26.5"
+  checksum: 10/0097779d94bc0fd26f0418b3a05472410408877279141ded2bd449167be1aed7ea5b76f756562cb3586a07f251b90799bab22d9019ceba49c037c76445f7cddd
   languageName: node
   linkType: hard
 
