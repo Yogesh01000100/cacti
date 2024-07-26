@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1721847653648,
+  "lastUpdate": 1722027847216,
   "repoUrl": "https://github.com/Yogesh01000100/cacti",
   "entries": {
     "Benchmark": [
@@ -69,6 +69,44 @@ window.BENCHMARK_DATA = {
             "range": "±2.74%",
             "unit": "ops/sec",
             "extra": "176 samples"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jagpreet.singh.sasan@accenture.com",
+            "name": "jagpreetsinghsasan",
+            "username": "jagpreetsinghsasan"
+          },
+          "committer": {
+            "email": "petermetz@users.noreply.github.com",
+            "name": "Peter Somogyvari",
+            "username": "petermetz"
+          },
+          "distinct": true,
+          "id": "9c4d9be8ac7a1608bf15cbaf887ed0836c02f747",
+          "message": "build(api-client): generate go client\n\n    Primary Changes\n    ----------------\n    1. Updated package.json file for packages to\n       include the new codegen script\n    2. Added a new dep, replace for string\n       manupulation in package.json\n\nFixes #393\n\nSigned-off-by: jagpreetsinghsasan <jagpreet.singh.sasan@accenture.com>",
+          "timestamp": "2024-07-25T14:06:22-07:00",
+          "tree_id": "4db60a87b0df4cca6a76f559d461c607d148f604",
+          "url": "https://github.com/Yogesh01000100/cacti/commit/9c4d9be8ac7a1608bf15cbaf887ed0836c02f747"
+        },
+        "date": 1722027844478,
+        "tool": "benchmarkjs",
+        "benches": [
+          {
+            "name": "cmd-api-server_HTTP_GET_getOpenApiSpecV1",
+            "value": 581,
+            "range": "±1.70%",
+            "unit": "ops/sec",
+            "extra": "178 samples"
+          },
+          {
+            "name": "cmd-api-server_gRPC_GetOpenApiSpecV1",
+            "value": 361,
+            "range": "±1.25%",
+            "unit": "ops/sec",
+            "extra": "181 samples"
           }
         ]
       }
