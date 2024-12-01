@@ -42,7 +42,7 @@ export class Stage0RollbackStrategy implements RollbackStrategy {
     try {
       const rollbackLogEntry = new RollbackLogEntry({
         sessionId: session.getSessionId(),
-        stage: String(sessionData.hashes?.stage0),
+        stage: "stage0",
         timestamp: new Date().toISOString(),
         action: "NO_ACTION_REQUIRED",
         status: "SUCCESS",

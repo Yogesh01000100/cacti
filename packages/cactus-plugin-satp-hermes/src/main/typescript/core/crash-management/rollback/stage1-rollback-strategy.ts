@@ -10,15 +10,15 @@ import { ILocalLogRepository } from "../../../repository/interfaces/repository";
 
 export class Stage1RollbackStrategy implements RollbackStrategy {
   private log: Logger;
-  private bridgesManager: SATPBridgesManager;
+  private bridgeManager: SATPBridgesManager;
   private logRepository: ILocalLogRepository;
 
   constructor(
-    bridgeManager: SATPBridgesManager,
+    bridgesManager: SATPBridgesManager,
     localLog: ILocalLogRepository,
   ) {
     this.log = LoggerProvider.getOrCreate({ label: "Stage1RollbackStrategy" });
-    this.bridgesManager = bridgeManager;
+    this.bridgeManager = bridgesManager;
     this.logRepository = localLog;
   }
 
@@ -34,51 +34,76 @@ export class Stage1RollbackStrategy implements RollbackStrategy {
       throw new Error(`${fnTag}, session data is not correctly initialized`);
     }
 
+    const isClient = session.hasClientSessionData();
+    const network = isClient
+      ? sessionData.senderGatewayNetworkId
+      : sessionData.recipientGatewayNetworkId;
+
+    if (isClient && !network) {
+      throw new Error(
+        `${fnTag}: Unable to determine client network from session data.`,
+      );
+    }
+    this.log.info(`${fnTag} network: ${network}`);
+
+    const bridge = this.bridgeManager.getBridge(network);
+    if (!bridge) {
+      throw new Error(`${fnTag}: No bridge found for network: ${network}`);
+    }
+
     const rollbackState = new RollbackState({
       sessionId: session.getSessionId(),
-      currentStage: String(sessionData.hashes?.stage1),
-      stepsRemaining: 0,
+      currentStage: "Stage1",
+      stepsRemaining: isClient ? 1 : 0,
       rollbackLogEntries: [],
       estimatedTimeToCompletion: "",
       status: "IN_PROGRESS",
       details: "",
     });
 
-    const network = sessionData.senderGatewayNetworkId;
-
-    if (!network) {
-      throw new Error(
-        `${fnTag}: Unable to determine network from session data.`,
-      );
-    }
-
-    const bridgeManager = this.bridgesManager.getBridge(network);
-
     try {
-      const assetId = sessionData.senderAsset?.tokenId;
+      if (isClient) {
+        // Client-side:
+        const assetId = sessionData.senderAsset?.tokenId;
 
-      if (!assetId) {
-        throw new Error(`${fnTag}: Asset ID is undefined`);
+        if (!assetId) {
+          throw new Error(`${fnTag}: Asset ID is undefined`);
+        }
+
+        this.log.info(`${fnTag} Unwrapping Asset ID: ${assetId}`);
+
+        await bridge.unwrapAsset(assetId);
+
+        const rollbackLogEntry = new RollbackLogEntry({
+          sessionId: session.getSessionId(),
+          stage: "Stage1",
+          timestamp: new Date().toISOString(),
+          action: "UNWRAP_ASSET",
+          status: "SUCCESS",
+          details: "",
+        });
+
+        rollbackState.rollbackLogEntries.push(rollbackLogEntry);
+        rollbackState.stepsRemaining = 0;
+        rollbackState.estimatedTimeToCompletion = "";
+        rollbackState.status = "COMPLETED";
+        rollbackState.details = "Rollback of Stage 1 completed successfully";
+      } else {
+        // Server-side:
+        const rollbackLogEntry = new RollbackLogEntry({
+          sessionId: session.getSessionId(),
+          stage: "Stage1",
+          timestamp: new Date().toISOString(),
+          action: "NO_ACTION_REQUIRED",
+          status: "SUCCESS",
+          details: "No rollback action required for server in Stage 1.",
+        });
+
+        rollbackState.rollbackLogEntries.push(rollbackLogEntry);
+        rollbackState.status = "COMPLETED";
+        rollbackState.details =
+          "No rollback action required for server in Stage 1.";
       }
-
-      this.log.info(`${fnTag}, Asset Id: ${assetId}`);
-
-      await bridgeManager.unwrapAsset(assetId);
-
-      const rollbackLogEntry = new RollbackLogEntry({
-        sessionId: session.getSessionId(),
-        stage: String(sessionData.hashes?.stage1),
-        timestamp: new Date().toISOString(),
-        action: "UNWRAP_ASSET",
-        status: "SUCCESS",
-        details: "",
-      });
-
-      rollbackState.rollbackLogEntries.push(rollbackLogEntry);
-      rollbackState.stepsRemaining = 0;
-      rollbackState.status = "COMPLETED";
-      rollbackState.estimatedTimeToCompletion = "";
-      rollbackState.details = "Rollback of Stage 1 completed successfully";
 
       this.log.info(
         `${fnTag} Successfully rolled back Stage 1 for session ${session.getSessionId}`,
@@ -91,11 +116,11 @@ export class Stage1RollbackStrategy implements RollbackStrategy {
 
       const rollbackLogEntry = new RollbackLogEntry({
         sessionId: sessionData.id,
-        stage: String(sessionData.hashes?.stage1),
+        stage: "Stage1",
         timestamp: new Date().toISOString(),
-        action: "UNWRAP_ASSET",
+        action: isClient ? "UNWRAP_ASSET" : "NO_ACTION_REQUIRED",
         status: "FAILED",
-        details: "",
+        details: `Rollback of Stage 1 failed: ${error}`,
       });
 
       rollbackState.rollbackLogEntries.push(rollbackLogEntry);

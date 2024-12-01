@@ -8,6 +8,11 @@ import {
   Address,
 } from "../../../../main/typescript/core/types";
 import {
+  pruneDockerAllIfGithubAction,
+  Containers,
+} from "@hyperledger/cactus-test-tooling";
+import { BesuTestEnvironment, FabricTestEnvironment } from "../../test-utils";
+import {
   Asset,
   CredentialProfile,
   LockType,
@@ -29,18 +34,30 @@ import {
 } from "@hyperledger/cactus-core-api";
 import { bufArray2HexStr } from "../../../../main/typescript/gateway-utils";
 import { knexClientConnection, knexServerConnection } from "../../knex.config";
+import { LogLevelDesc, LoggerProvider } from "@hyperledger/cactus-common";
+import { ClaimFormat } from "../../../../main/typescript/generated/proto/cacti/satp/v02/common/message_pb";
 import { Knex, knex } from "knex";
+
+let fabricEnv: FabricTestEnvironment;
+let besuEnv: BesuTestEnvironment;
 
 let knexInstanceClient: Knex;
 let knexInstanceServer: Knex;
 
 let gateway1: SATPGateway;
 let gateway2: SATPGateway;
+const bridge_id =
+  "x509::/OU=org2/OU=client/OU=department1/CN=bridge::/C=UK/ST=Hampshire/L=Hursley/O=org2.example.com/CN=ca.org2.example.com";
 
 let crashManager1: CrashRecoveryManager;
 let crashManager2: CrashRecoveryManager;
 
 const keyPairs = Secp256k1Keys.generateKeyPairsBuffer();
+const logLevel: LogLevelDesc = "DEBUG";
+const log = LoggerProvider.getOrCreate({
+  level: logLevel,
+  label: "BUNGEE - Hermes",
+});
 
 const createMockSession = (
   maxTimeout: string,
@@ -53,6 +70,7 @@ const createMockSession = (
     server: !isClient,
     client: isClient,
   });
+
   const sessionData = mockSession.hasClientSessionData()
     ? mockSession.getClientSessionData()
     : mockSession.getServerSessionData();
@@ -70,9 +88,7 @@ const createMockSession = (
   sessionData.digitalAssetId = "MOCK_DIGITAL_ASSET_ID";
   sessionData.assetProfileId = "MOCK_ASSET_PROFILE_ID";
   sessionData.receiverGatewayOwnerId = "MOCK_RECEIVER_GATEWAY_OWNER_ID";
-  sessionData.recipientGatewayNetworkId = SupportedChain.FABRIC;
   sessionData.senderGatewayOwnerId = "MOCK_SENDER_GATEWAY_OWNER_ID";
-  sessionData.senderGatewayNetworkId = SupportedChain.BESU;
   sessionData.signatureAlgorithm = SignatureAlgorithm.RSA;
   sessionData.lockType = LockType.FAUCET;
   sessionData.lockExpirationTime = BigInt(1000);
@@ -87,7 +103,7 @@ const createMockSession = (
   sessionData.senderAsset = new Asset();
   sessionData.senderAsset.tokenId = "MOCK_TOKEN_ID";
   sessionData.senderAsset.tokenType = TokenType.ERC20;
-  sessionData.senderAsset.amount = BigInt(0);
+  sessionData.senderAsset.amount = BigInt(100);
   sessionData.senderAsset.owner = "MOCK_SENDER_ASSET_OWNER";
   sessionData.senderAsset.ontology = "MOCK_SENDER_ASSET_ONTOLOGY";
   sessionData.senderAsset.contractName = "MOCK_SENDER_ASSET_CONTRACT_NAME";
@@ -95,7 +111,7 @@ const createMockSession = (
     "MOCK_SENDER_ASSET_CONTRACT_ADDRESS";
   sessionData.receiverAsset = new Asset();
   sessionData.receiverAsset.tokenType = TokenType.ERC20;
-  sessionData.receiverAsset.amount = BigInt(0);
+  sessionData.receiverAsset.amount = BigInt(100);
   sessionData.receiverAsset.owner = "MOCK_RECEIVER_ASSET_OWNER";
   sessionData.receiverAsset.ontology = "MOCK_RECEIVER_ASSET_ONTOLOGY";
   sessionData.receiverAsset.contractName = "MOCK_RECEIVER_ASSET_CONTRACT_NAME";
@@ -103,85 +119,52 @@ const createMockSession = (
   sessionData.receiverAsset.channelName = "MOCK_CHANNEL_ID";
   sessionData.lastSequenceNumber = BigInt(4);
 
+  if (isClient) {
+    sessionData.senderGatewayNetworkId = SupportedChain.BESU;
+    sessionData.recipientGatewayNetworkId = SupportedChain.FABRIC;
+  } else {
+    sessionData.senderGatewayNetworkId = SupportedChain.FABRIC;
+    sessionData.recipientGatewayNetworkId = SupportedChain.BESU;
+  }
+
   return mockSession;
 };
 
 beforeAll(async () => {
-  const factoryOptions: IPluginFactoryOptions = {
-    pluginImportType: PluginImportType.Local,
-  };
-  const factory = new PluginFactorySATPGateway(factoryOptions);
+  pruneDockerAllIfGithubAction({ logLevel })
+    .then(() => {
+      log.info("Pruning throw OK");
+    })
+    .catch(async () => {
+      await Containers.logDiagnostics({ logLevel });
+      fail("Pruning didn't throw OK");
+    });
 
-  const gateway1KeyPair = Secp256k1Keys.generateKeyPairsBuffer();
-  const gateway2KeyPair = Secp256k1Keys.generateKeyPairsBuffer();
+  {
+    const satpContractName = "satp-contract";
+    fabricEnv = await FabricTestEnvironment.setupTestEnvironment(
+      satpContractName,
+      bridge_id,
+      logLevel,
+    );
+    log.info("Fabric Ledger started successfully");
 
-  const gatewayIdentity1: GatewayIdentity = {
-    id: "mockID-1",
-    name: "CustomGateway1",
-    pubKey: bufArray2HexStr(gateway1KeyPair.publicKey),
-    version: [
-      {
-        Core: "v02",
-        Architecture: "v02",
-        Crash: "v02",
-      },
-    ],
-    supportedDLTs: [SupportedChain.BESU],
-    proofID: "mockProofID10",
-    address: "http://localhost" as Address,
-    gatewayServerPort: 3005,
-    gatewayClientPort: 3001,
-    gatewayOpenAPIPort: 3002,
-  };
+    await fabricEnv.deployAndSetupContracts(ClaimFormat.DEFAULT);
+  }
 
-  const gatewayIdentity2: GatewayIdentity = {
-    id: "mockID-2",
-    name: "CustomGateway2",
-    pubKey: bufArray2HexStr(gateway2KeyPair.publicKey),
-    version: [
-      {
-        Core: "v02",
-        Architecture: "v02",
-        Crash: "v02",
-      },
-    ],
-    supportedDLTs: [SupportedChain.FABRIC],
-    proofID: "mockProofID11",
-    address: "http://localhost" as Address,
-    gatewayServerPort: 3225,
-    gatewayClientPort: 3211,
-    gatewayOpenAPIPort: 4210,
-  };
+  {
+    const erc20TokenContract = "SATPContract";
+    const contractNameWrapper = "SATPWrapperContract";
 
-  knexInstanceClient = knex(knexClientConnection);
-  await knexInstanceClient.migrate.latest();
+    besuEnv = await BesuTestEnvironment.setupTestEnvironment(
+      erc20TokenContract,
+      contractNameWrapper,
+      logLevel,
+    );
+    log.info("Besu Ledger started successfully");
 
-  const options1: SATPGatewayConfig = {
-    logLevel: "DEBUG",
-    gid: gatewayIdentity1,
-    counterPartyGateways: [gatewayIdentity2],
-    keyPair: gateway1KeyPair,
-    knexConfig: knexClientConnection,
-  };
-
-  knexInstanceServer = knex(knexServerConnection);
-  await knexInstanceServer.migrate.latest();
-
-  const options2: SATPGatewayConfig = {
-    logLevel: "DEBUG",
-    gid: gatewayIdentity2,
-    counterPartyGateways: [gatewayIdentity1],
-    keyPair: gateway2KeyPair,
-    knexConfig: knexServerConnection,
-  };
-
-  gateway1 = (await factory.create(options1)) as SATPGateway;
-  expect(gateway1).toBeInstanceOf(SATPGateway);
-  await gateway1.startup();
-
-  gateway2 = (await factory.create(options2)) as SATPGateway;
-  expect(gateway2).toBeInstanceOf(SATPGateway);
-  await gateway2.startup();
+    await besuEnv.deployAndSetupContracts(ClaimFormat.DEFAULT);
+  }
 });
 
 afterEach(async () => {
@@ -203,10 +186,100 @@ afterAll(async () => {
     await knexInstanceClient.destroy();
     await knexInstanceServer.destroy();
   }
+
+  await besuEnv.tearDown();
+  await fabricEnv.tearDown();
+
+  await pruneDockerAllIfGithubAction({ logLevel })
+    .then(() => {
+      log.info("Pruning throw OK");
+    })
+    .catch(async () => {
+      await Containers.logDiagnostics({ logLevel });
+      fail("Pruning didn't throw OK");
+    });
 });
 
 describe("Crash Recovery Manager - Rollback", () => {
-  it("should successfully initiate rollback and call unwrapAsset", async () => {
+  it("should successfully initiate rollback", async () => {
+    const factoryOptions: IPluginFactoryOptions = {
+      pluginImportType: PluginImportType.Local,
+    };
+    const factory = new PluginFactorySATPGateway(factoryOptions);
+
+    const gateway1KeyPair = Secp256k1Keys.generateKeyPairsBuffer();
+    const gateway2KeyPair = Secp256k1Keys.generateKeyPairsBuffer();
+
+    const gatewayIdentity1: GatewayIdentity = {
+      id: "mockID-1",
+      name: "CustomGateway1",
+      pubKey: bufArray2HexStr(gateway1KeyPair.publicKey),
+      version: [
+        {
+          Core: "v02",
+          Architecture: "v02",
+          Crash: "v02",
+        },
+      ],
+      supportedDLTs: [SupportedChain.BESU],
+      proofID: "mockProofID10",
+      address: "http://localhost" as Address,
+      gatewayServerPort: 3005,
+      gatewayClientPort: 3001,
+      gatewayOpenAPIPort: 3002,
+    };
+
+    const gatewayIdentity2: GatewayIdentity = {
+      id: "mockID-2",
+      name: "CustomGateway2",
+      pubKey: bufArray2HexStr(gateway2KeyPair.publicKey),
+      version: [
+        {
+          Core: "v02",
+          Architecture: "v02",
+          Crash: "v02",
+        },
+      ],
+      supportedDLTs: [SupportedChain.FABRIC],
+      proofID: "mockProofID11",
+      address: "http://localhost" as Address,
+      gatewayServerPort: 3225,
+      gatewayClientPort: 3211,
+      gatewayOpenAPIPort: 4210,
+    };
+
+    knexInstanceClient = knex(knexClientConnection);
+    await knexInstanceClient.migrate.latest();
+
+    const options1: SATPGatewayConfig = {
+      logLevel: "DEBUG",
+      gid: gatewayIdentity1,
+      counterPartyGateways: [gatewayIdentity2],
+      keyPair: gateway1KeyPair,
+      bridgesConfig: [besuEnv.besuConfig],
+      knexConfig: knexClientConnection,
+    };
+
+    knexInstanceServer = knex(knexServerConnection);
+    await knexInstanceServer.migrate.latest();
+
+    const options2: SATPGatewayConfig = {
+      logLevel: "DEBUG",
+      gid: gatewayIdentity2,
+      counterPartyGateways: [gatewayIdentity1],
+      keyPair: gateway2KeyPair,
+      bridgesConfig: [fabricEnv.fabricConfig],
+      knexConfig: knexServerConnection,
+    };
+
+    gateway1 = (await factory.create(options1)) as SATPGateway;
+    expect(gateway1).toBeInstanceOf(SATPGateway);
+    await gateway1.startup();
+
+    gateway2 = (await factory.create(options2)) as SATPGateway;
+    expect(gateway2).toBeInstanceOf(SATPGateway);
+    await gateway2.startup();
+
     crashManager1 = gateway1["crashManager"] as CrashRecoveryManager;
     expect(crashManager1).toBeInstanceOf(CrashRecoveryManager);
 
@@ -251,7 +324,7 @@ describe("Crash Recovery Manager - Rollback", () => {
     const mockLogRepository2 = crashManager2["logRepository"];
     await mockLogRepository2.create(mockLogEntry2);
 
-    //await crashManager2.recoverSessions();
+    await crashManager2.recoverSessions();
 
     const result = await crashManager1.initiateRollback(clientSession, true);
 
